@@ -19,8 +19,9 @@ python3 -m pip install --upgrade pip
 
 echo "Installing required packages"
 python3 -m pip install numpy scipy
+python3 -m pip install gmsh matplotlib
 
 echo "Test Packages"
-python -c "import numpy, scipy; print('NumPy:', numpy.__version__, '| SciPy:', scipy.__version__)"
+python3 -c "import numpy, scipy, gmsh, matplotlib.pyplot as plt; print('OK', numpy.__version__, scipy.__version__, gmsh.__version__, plt.matplotlib.__version__)"
 
 echo -e "Packages Succesfully Installed,\nTo open Venv, enter 'source AeroVenv/bin/activate'"
