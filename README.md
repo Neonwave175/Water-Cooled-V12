@@ -20,4 +20,8 @@ A Python-based tool to optimize NACA 4-digit airfoils for maximum lift-to-drag r
 * Colored terminal output for readability
 
 ####  Python Requirements
-Run 'bash
+##### Python part
+Run `bash PythonInstall.sh`, This installs all required python packages and creates the venv
+To activate the venv type `source AeroVenv/bin/activate`
+##### Xfoil
+Run `bash XfoilSetup.sh` Then move the file xfoil to `/usr/local/bin/xfoil`
