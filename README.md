@@ -18,3 +18,6 @@ A Python-based tool to optimize NACA 4-digit airfoils for maximum lift-to-drag r
 * Automatic fluke detection & confirmation
 * Uses SciPy differential evolution
 * Colored terminal output for readability
+
+####  Python Requirements
+Run 'bash
