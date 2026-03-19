@@ -3,26 +3,27 @@
 # Stop if anything fails
 set -e
 
-echo "🔧 Installing dependencies (macOS with Homebrew)..."
+echo "Installing dependencies (macOS with Homebrew)"
 brew install cmake gcc
 
-echo "📥 Cloning XFOIL repository..."
-git clone https://github.com/RobotLocomotion/xfoil.git
+echo "Cloning XFOIL repository"
+git clone https://github.com/RobotLocomotion/xfoil.git XfoilRun
 
-echo "📂 Entering directory..."
-cd xfoil
+echo "Entering directory"
+cd XfoilRun
 
-echo "🛠️ Creating build folder..."
+echo "Creating build folder"
 mkdir -p build
 cd build
 
-echo "⚙️ Running CMake..."
+echo "Running CMake"
 cmake ..
 
-echo "🔨 Building..."
+echo "Building"
 make -j$(sysctl -n hw.ncpu)
 
-echo "✅ Build complete!"
+echo "Build complete!"
 
-echo "🚀 Running XFOIL..."
+echo "Open XFOIL"
+cd src
 ./xfoil
