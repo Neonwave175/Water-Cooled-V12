@@ -13,3 +13,8 @@ A Python-based tool to optimize NACA 4-digit airfoils for maximum lift-to-drag r
 * Finds the best aerofoil for the given re
 
 #### Features
+* Optimizes NACA 4-digit parameters (m, p, t)
+* Multi-Reynolds evaluation
+* Automatic fluke detection & confirmation
+* Uses SciPy differential evolution
+* Colored terminal output for readability
