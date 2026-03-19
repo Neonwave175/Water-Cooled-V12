@@ -4,7 +4,7 @@ Simple system for generating optimal wings and testing them
 ## Tools
 Below are the tools in this repo
 
-### OptimAerofoil.py
+### OptimAerofoilmake.py
 A Python-based tool to optimize NACA 4-digit airfoils for maximum lift-to-drag ratio (L/D) using XFOIL and differential evolution.
 #### What It Does
 * Generates aerofoil geometry
@@ -25,3 +25,6 @@ Run `bash PythonInstall.sh`, This installs all required python packages and crea
 To activate the venv type `source AeroVenv/bin/activate`
 ##### Xfoil
 Run `bash XfoilSetup.sh` Then move the file xfoil to `/usr/local/bin/xfoil`
+
+### NACAToSU2.py
+
