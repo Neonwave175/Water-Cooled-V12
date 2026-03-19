@@ -27,4 +27,6 @@ To activate the venv type `source AeroVenv/bin/activate`
 Run `bash XfoilSetup.sh` Then move the file xfoil to `/usr/local/bin/xfoil`
 
 ### NACAToSU2.py
-
+A Python tool to generate, visualise, and export a CFD-ready C-type mesh around any NACA 4-digit airfoil.
+#### What It Does
+* Creates SU2 files from NACA 4 codes
