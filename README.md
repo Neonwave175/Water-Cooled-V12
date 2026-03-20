@@ -1,6 +1,12 @@
 # Water-Cooled-V12
 Simple system for generating optimal wings and testing them
 
+> Designed for MacOS, .sh files won't work on Windows
+
+
+
+> Some features may not also work on Linux
+
 ## Tools
 Below are the tools in this repo
 
@@ -30,3 +36,12 @@ Run `bash XfoilSetup.sh` Then move the file xfoil to `/usr/local/bin/xfoil`
 A Python tool to generate, visualise, and export a CFD-ready C-type mesh around any NACA 4-digit airfoil.
 #### What It Does
 * Creates SU2 files from NACA 4 codes
+
+#### Features
+* Visualiser system using mathplotlib
+* Automaticaly saves SU2 file
+
+####  Python Requirements
+##### Python part
+Run `bash PythonInstall.sh`, This installs all required python packages and creates the venv
+To activate the venv type `source AeroVenv/bin/activate`
