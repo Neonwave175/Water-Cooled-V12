@@ -1,5 +1,5 @@
 import os
-
+# IN DEVELOPMENT
 def generate_su2_cfg():
     print("--- SU2 Configuration File Generator ---")
     print("Press [Enter] to accept the default value shown in brackets.\n")
