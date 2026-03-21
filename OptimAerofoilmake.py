@@ -239,9 +239,9 @@ def evaluate_ld(coords, reynolds_range, aoa_start, aoa_end, aoa_step, max_ld):
     scores = []
     for Re in reynolds_range:
         score = run_xfoil(coords, Re, aoa_start, aoa_end, aoa_step, max_ld)
-        scores.append(score)  # keep nan in place — preserves index alignment with reynolds_range
-    finite = [s for s in scores if np.isfinite(s)]
-    avg_ld = np.mean(finite) if finite else float('nan')
+        scores.append(score)
+    numeric = [s if np.isfinite(s) else 0.0 for s in scores]
+    avg_ld = np.mean(numeric) if numeric else float('nan')
     return scores, avg_ld
 
 
