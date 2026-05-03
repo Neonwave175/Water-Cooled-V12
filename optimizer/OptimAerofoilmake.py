@@ -304,7 +304,6 @@ if __name__ == "__main__":
         'max_ld':         MAX_LD,
     })
 
-    global _result_queue
     _result_queue = multiprocessing.Queue()
 
     start_time = time.time()
