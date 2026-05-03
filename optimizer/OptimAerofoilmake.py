@@ -323,22 +323,15 @@ if __name__ == "__main__":
     best_naca   = f"{int(round(best_m))}{int(round(best_p))}{int(round(best_t)):02d}"
     best_coords = naca4_coordinates(best_m, best_p, best_t)
 
+    scores, best_ld = evaluate_ld(best_coords, reynolds_range, aoa_start, aoa_end, aoa_step, MAX_LD)
+
     bar = f"{DIM}{'─'*60}{RESET}"
-    print(f"\n{DIM}verifying NACA {best_naca} (3 runs){RESET}")
-    run_lds = []
-    for i in range(3):
-        _, ld = evaluate_ld(best_coords, reynolds_range, aoa_start, aoa_end, aoa_step, MAX_LD)
-        run_lds.append(ld)
-        tag = f"{YELLOW}{ld:.4f}{RESET}" if np.isfinite(ld) else f"{RED}fail{RESET}"
-        print(f"  {DIM}run {i+1}{RESET}  {tag}")
-
-    valid_runs   = [r for r in run_lds if np.isfinite(r)]
-    confirmed_ld = float(np.mean(valid_runs)) if valid_runs else float('nan')
-
     print(f"\n{bar}")
     print(f"  {MUTED}airfoil{RESET}      {WHITE}{BOLD}NACA {best_naca}{RESET}")
     print(f"  {MUTED}params{RESET}       {DIM}m={best_m:.3f}  p={best_p:.3f}  t={best_t:.3f}{RESET}")
-    print(f"  {MUTED}confirmed l/d{RESET}  {GREEN}{confirmed_ld:.4f}{RESET}")
+    re_cols = "  ".join(fmt_re_col(Re, i, scores) for i, Re in enumerate(reynolds_range))
+    print(f"  {MUTED}l/d per Re{RESET}   {re_cols}")
+    print(f"  {MUTED}avg l/d{RESET}      {GREEN}{best_ld:.4f}{RESET}")
     print(f"  {MUTED}generations{RESET}  {WHITE}{gen_count[0]}{RESET}")
     print(f"  {MUTED}time{RESET}         {WHITE}{time.time()-start_time:.1f}s{RESET}")
     print(f"{bar}\n")
