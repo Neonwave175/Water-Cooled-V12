@@ -5,7 +5,9 @@ import re
 import shutil
 import multiprocessing
 import queue
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from scipy.optimize import differential_evolution
 
 XFOIL_PATH = shutil.which("xfoil")
@@ -185,8 +187,9 @@ def parse_xfoil_output(stdout):
 
 def run_xfoil(coords, reynolds, aoa_start, aoa_end, aoa_step, max_ld):
     pid = os.getpid()
-    coord_name = f"airfoil_{pid}.dat"
-    polar_name = f"polar_{pid}.dat"
+    tid = threading.get_ident() % 1_000_000
+    coord_name = f"airfoil_{pid}_{tid}.dat"
+    polar_name = f"polar_{pid}_{tid}.dat"
     coord_file = os.path.join(TMPDIR, coord_name)
     polar_file = os.path.join(TMPDIR, polar_name)
 
@@ -248,12 +251,12 @@ QUIT
 
 
 def evaluate_ld(coords, reynolds_range, aoa_start, aoa_end, aoa_step, max_ld):
-    scores = []
-    for Re in reynolds_range:
-        score = run_xfoil(coords, Re, aoa_start, aoa_end, aoa_step, max_ld)
-        scores.append(score)
-    numeric = [s if np.isfinite(s) else 0.0 for s in scores]
-    avg_ld = np.mean(numeric) if numeric else float('nan')
+    with ThreadPoolExecutor(max_workers=len(reynolds_range)) as ex:
+        futures = [ex.submit(run_xfoil, coords, Re, aoa_start, aoa_end, aoa_step, max_ld)
+                   for Re in reynolds_range]
+        scores = [f.result() for f in futures]
+    finite = [s for s in scores if np.isfinite(s)]
+    avg_ld = float(np.mean(finite)) if finite else float('nan')
     return scores, avg_ld
 
 
@@ -335,6 +338,9 @@ if __name__ == "__main__":
               f"{WHITE}{BOLD}best {naca}{RESET}  "
               f"{DIM}convergence{RESET} {MUTED}{convergence:.6f}{RESET}\n")
 
+    n_workers = max(1, (os.cpu_count() or 1) - 1)
+    print(f"{DIM}using {n_workers} workers  ({os.cpu_count()} logical cores){RESET}\n")
+
     result = differential_evolution(
         _objective,
         bounds=cfg["bounds"],
@@ -343,7 +349,7 @@ if __name__ == "__main__":
         seed=cfg["seed"],
         tol=1e-4,
         disp=False,
-        workers=6,
+        workers=n_workers,
         updating='deferred',
         callback=callback,
     )
