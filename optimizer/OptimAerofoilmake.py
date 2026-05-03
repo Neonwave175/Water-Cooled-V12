@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import multiprocessing
+import queue
 import time
 from scipy.optimize import differential_evolution
 
@@ -32,6 +33,9 @@ CONFIRM_MARGIN    = 0.5
 # Populated in __main__ before the worker pool is forked so every worker
 # inherits a read-only copy without any IPC overhead.
 _worker_cfg: dict = {}
+
+# Workers push (naca, scores, avg_ld) here; callback drains and prints.
+_result_queue: multiprocessing.Queue = None
 
 
 def fmt_time(s):
@@ -254,10 +258,10 @@ def evaluate_ld(coords, reynolds_range, aoa_start, aoa_end, aoa_step, max_ld):
 
 
 def _objective(params):
-    """Pure objective for parallel workers — no shared state, no printing."""
+    """Pure objective for parallel workers — pushes results to queue for printing."""
     m, p, t = params
     coords = naca4_coordinates(m, p, t)
-    _, avg_ld = evaluate_ld(
+    scores, avg_ld = evaluate_ld(
         coords,
         _worker_cfg['reynolds_range'],
         _worker_cfg['aoa_start'],
@@ -265,6 +269,12 @@ def _objective(params):
         _worker_cfg['aoa_step'],
         _worker_cfg['max_ld'],
     )
+    naca = f"{int(round(m))}{int(round(p))}{int(round(t)):02d}"
+    if _result_queue is not None:
+        try:
+            _result_queue.put_nowait((naca, scores, avg_ld))
+        except Exception:
+            pass
     return -avg_ld if np.isfinite(avg_ld) else 0.0
 
 
@@ -294,17 +304,37 @@ if __name__ == "__main__":
         'max_ld':         MAX_LD,
     })
 
+    global _result_queue
+    _result_queue = multiprocessing.Queue()
+
     start_time = time.time()
     gen_count  = [0]
+    eval_count = [0]
 
     def callback(xk, convergence):
+        # Drain all results queued by workers during this generation.
+        while True:
+            try:
+                naca, scores, avg_ld = _result_queue.get_nowait()
+                eval_count[0] += 1
+                n         = eval_count[0]
+                elapsed   = time.time() - start_time
+                re_cols   = "  ".join(fmt_re_col(Re, i, scores) for i, Re in enumerate(reynolds_range))
+                avg_color = GREEN if np.isfinite(avg_ld) and avg_ld > 40 else WHITE
+                print(f"  {DIM}#{n:<4} {fmt_time(elapsed)}{RESET}  "
+                      f"{WHITE}{BOLD}NACA {naca}{RESET}  "
+                      f"{re_cols}  "
+                      f"{DIM}avg{RESET} {avg_color}{avg_ld:.4f}{RESET}")
+            except queue.Empty:
+                break
+
         gen_count[0] += 1
         elapsed = time.time() - start_time
         m, p, t = xk
         naca = f"{int(round(m))}{int(round(p))}{int(round(t)):02d}"
-        print(f"  {DIM}gen {gen_count[0]:<3} [{elapsed:.1f}s]{RESET}  "
-              f"{WHITE}{BOLD}NACA {naca}{RESET}  "
-              f"{DIM}convergence{RESET} {MUTED}{convergence:.6f}{RESET}")
+        print(f"\n  {DIM}gen {gen_count[0]:<3} [{elapsed:.1f}s]{RESET}  "
+              f"{WHITE}{BOLD}best {naca}{RESET}  "
+              f"{DIM}convergence{RESET} {MUTED}{convergence:.6f}{RESET}\n")
 
     result = differential_evolution(
         _objective,
