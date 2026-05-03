@@ -11,7 +11,7 @@ if ! command -v python3 &> /dev/null; then
 fi
 
 echo "Creating Venv"
-python3.12 -m venv AeroVenv
+python3 -m venv AeroVenv
 source AeroVenv/bin/activate
 
 echo "Upgrading pip"

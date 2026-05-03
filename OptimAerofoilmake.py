@@ -7,8 +7,6 @@ import multiprocessing
 import time
 from scipy.optimize import differential_evolution
 
-multiprocessing.set_start_method("fork")
-
 XFOIL_PATH = shutil.which("xfoil")
 if XFOIL_PATH is None:
     raise RuntimeError("xfoil not found on PATH. Run: brew install xfoil")
@@ -246,6 +244,7 @@ def evaluate_ld(coords, reynolds_range, aoa_start, aoa_end, aoa_step, max_ld):
 
 
 if __name__ == "__main__":
+    multiprocessing.set_start_method("fork")
     cfg = get_user_parameters()
 
     reynolds_range = cfg["reynolds_range"]
@@ -289,6 +288,7 @@ if __name__ == "__main__":
                 verified_best['naca']   = naca
                 verified_best['params'] = (m, p, t)
                 print(f"  {GREEN}confirmed{RESET}  {WHITE}{BOLD}NACA {naca}{RESET}  {DIM}run1{RESET} {YELLOW}{avg_ld:.4f}{RESET}  {DIM}run2{RESET} {YELLOW}{ld_2:.4f}{RESET}  {DIM}avg{RESET} {GREEN}{confirmed_ld:.4f}{RESET}")
+                avg_ld = confirmed_ld
             else:
                 avg_ld = confirmed_ld
                 print(f"  {RED}fluke{RESET}      {WHITE}{BOLD}NACA {naca}{RESET}  {DIM}run1{RESET} {YELLOW}{avg_ld:.4f}{RESET}  {DIM}run2{RESET} {YELLOW}{ld_2:.4f}{RESET}  {DIM}discarded{RESET}")

@@ -101,7 +101,7 @@ def _meanline_a1(x):
     eps = 1e-12
     x = np.clip(x, eps, 1.0 - eps)
     yc  = (1 / (2 * np.pi)) * (-x * np.log(x) + (1 - x) * np.log(1 - x) + 0.5 * (1 - x))
-    dyc = (1 / (2 * np.pi)) * (-np.log(x) - 1 - np.log(1 - x) + 1 - 0.5)
+    dyc = (1 / (2 * np.pi)) * (-np.log(x) - 1 - np.log(1 - x) - 1 - 0.5)
     return yc, dyc
 
 
@@ -120,10 +120,12 @@ def _fix_te_overlap(xu, yu, xl, yl):
 
     x_cut = x_check[cross_idx[0]]
 
-    xu = xu[xu <= x_cut]
-    yu = yu[:len(xu)]
-    xl = xl[xl <= x_cut]
-    yl = yl[:len(xl)]
+    mask_u = xu <= x_cut
+    xu = xu[mask_u]
+    yu = yu[mask_u]
+    mask_l = xl <= x_cut
+    xl = xl[mask_l]
+    yl = yl[mask_l]
 
     xu = np.append(xu, 1.0);  yu = np.append(yu, 0.0)
     xl = np.append(xl, 1.0);  yl = np.append(yl, 0.0)
