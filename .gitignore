@@ -4,3 +4,4 @@ _xfoil_tmp/
 AeroVenv/
 *_viz.png
 mesh_*.su2
+.DS_Store
