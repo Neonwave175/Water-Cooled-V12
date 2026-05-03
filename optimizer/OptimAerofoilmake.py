@@ -35,7 +35,7 @@ CONFIRM_MARGIN    = 0.5
 _worker_cfg: dict = {}
 
 # Workers push (naca, scores, avg_ld) here; callback drains and prints.
-_result_queue: multiprocessing.Queue = None
+_result_queue = None
 
 
 def fmt_time(s):
