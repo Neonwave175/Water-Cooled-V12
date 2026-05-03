@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+_xfoil_tmp/
+AeroVenv/
+*_viz.png
+mesh_*.su2

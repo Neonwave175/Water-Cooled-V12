@@ -177,24 +177,29 @@ def parse_xfoil_output(stdout):
 
 def run_xfoil(coords, reynolds, aoa_start, aoa_end, aoa_step, max_ld):
     pid = os.getpid()
-    coord_file = os.path.join(TMPDIR, f"airfoil_{pid}.dat")
-    polar_file  = os.path.join(TMPDIR, f"polar_{pid}.dat")
+    coord_name = f"airfoil_{pid}.dat"
+    polar_name = f"polar_{pid}.dat"
+    coord_file = os.path.join(TMPDIR, coord_name)
+    polar_file = os.path.join(TMPDIR, polar_name)
 
     if os.path.exists(polar_file):
         os.remove(polar_file)
 
     write_coords_file(coords, coord_file)
 
+    # xfoil is Fortran — list-directed reads treat '/' as a terminator, so an
+    # absolute path beginning with '/' gets truncated. Run xfoil with cwd set
+    # to TMPDIR and pass plain basenames to avoid the issue.
     commands = f"""PLOP
 G F
 
-LOAD {coord_file}
+LOAD {coord_name}
 PANE
 OPER
 VISC {reynolds}
 ITER 100
 PACC
-{polar_file}
+{polar_name}
 
 ASEQ {aoa_start} {aoa_end} {aoa_step}
 PACC
@@ -207,6 +212,7 @@ QUIT
         result = subprocess.run(
             [XFOIL_PATH], input=commands,
             capture_output=True, text=True, timeout=30,
+            cwd=TMPDIR,
         )
     except subprocess.TimeoutExpired:
         return np.nan
@@ -280,18 +286,20 @@ if __name__ == "__main__":
         print(f"  {DIM}#{n:<4} {fmt_time(elapsed)}{RESET}  {WHITE}{BOLD}NACA {naca}{RESET}  {re_cols}  {DIM}avg{RESET} {avg_color}{avg_ld:.4f}{RESET}")
 
         if np.isfinite(avg_ld) and avg_ld >= MIN_LD_TO_CONFIRM and avg_ld > verified_best['ld'] + CONFIRM_MARGIN:
-            scores_2, ld_2 = evaluate_ld(coords, reynolds_range, aoa_start, aoa_end, aoa_step, MAX_LD)
-            confirmed_ld   = np.mean([avg_ld, ld_2]) if np.isfinite(ld_2) else avg_ld
+            _, ld_2 = evaluate_ld(coords, reynolds_range, aoa_start, aoa_end, aoa_step, MAX_LD)
+            _, ld_3 = evaluate_ld(coords, reynolds_range, aoa_start, aoa_end, aoa_step, MAX_LD)
+            runs           = [avg_ld] + [r for r in (ld_2, ld_3) if np.isfinite(r)]
+            confirmed_ld   = float(np.mean(runs))
 
             if confirmed_ld > verified_best['ld']:
                 verified_best['ld']     = confirmed_ld
                 verified_best['naca']   = naca
                 verified_best['params'] = (m, p, t)
-                print(f"  {GREEN}confirmed{RESET}  {WHITE}{BOLD}NACA {naca}{RESET}  {DIM}run1{RESET} {YELLOW}{avg_ld:.4f}{RESET}  {DIM}run2{RESET} {YELLOW}{ld_2:.4f}{RESET}  {DIM}avg{RESET} {GREEN}{confirmed_ld:.4f}{RESET}")
+                print(f"  {GREEN}confirmed{RESET}  {WHITE}{BOLD}NACA {naca}{RESET}  {DIM}run1{RESET} {YELLOW}{avg_ld:.4f}{RESET}  {DIM}run2{RESET} {YELLOW}{ld_2:.4f}{RESET}  {DIM}run3{RESET} {YELLOW}{ld_3:.4f}{RESET}  {DIM}avg{RESET} {GREEN}{confirmed_ld:.4f}{RESET}")
                 avg_ld = confirmed_ld
             else:
+                print(f"  {RED}fluke{RESET}      {WHITE}{BOLD}NACA {naca}{RESET}  {DIM}run1{RESET} {YELLOW}{avg_ld:.4f}{RESET}  {DIM}run2{RESET} {YELLOW}{ld_2:.4f}{RESET}  {DIM}run3{RESET} {YELLOW}{ld_3:.4f}{RESET}  {DIM}avg{RESET} {YELLOW}{confirmed_ld:.4f}{RESET}  {DIM}discarded{RESET}")
                 avg_ld = confirmed_ld
-                print(f"  {RED}fluke{RESET}      {WHITE}{BOLD}NACA {naca}{RESET}  {DIM}run1{RESET} {YELLOW}{avg_ld:.4f}{RESET}  {DIM}run2{RESET} {YELLOW}{ld_2:.4f}{RESET}  {DIM}discarded{RESET}")
 
         ld_results.append((naca, avg_ld))
         return -avg_ld if np.isfinite(avg_ld) else 0.0
