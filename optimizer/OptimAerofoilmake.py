@@ -29,6 +29,10 @@ BOLD   = "\033[1m"
 MIN_LD_TO_CONFIRM = 30.0
 CONFIRM_MARGIN    = 0.5
 
+# Populated in __main__ before the worker pool is forked so every worker
+# inherits a read-only copy without any IPC overhead.
+_worker_cfg: dict = {}
+
 
 def fmt_time(s):
     return f"[{s:5.1f}s]"
@@ -36,7 +40,7 @@ def fmt_time(s):
 
 def fmt_re_col(re, i, scores):
     re_label = f"{CYAN}Re={re//1000}k{RESET}"
-    val = scores[i]  # scores[i] always maps to reynolds_range[i], nans included
+    val = scores[i]
     if np.isfinite(val):
         val_color = GREEN if val > 40 else WHITE
         return f"{re_label}{DIM}:{RESET}{val_color}{val:7.2f}{RESET}"
@@ -249,6 +253,21 @@ def evaluate_ld(coords, reynolds_range, aoa_start, aoa_end, aoa_step, max_ld):
     return scores, avg_ld
 
 
+def _objective(params):
+    """Pure objective for parallel workers — no shared state, no printing."""
+    m, p, t = params
+    coords = naca4_coordinates(m, p, t)
+    _, avg_ld = evaluate_ld(
+        coords,
+        _worker_cfg['reynolds_range'],
+        _worker_cfg['aoa_start'],
+        _worker_cfg['aoa_end'],
+        _worker_cfg['aoa_step'],
+        _worker_cfg['max_ld'],
+    )
+    return -avg_ld if np.isfinite(avg_ld) else 0.0
+
+
 if __name__ == "__main__":
     multiprocessing.set_start_method("fork")
     cfg = get_user_parameters()
@@ -266,76 +285,60 @@ if __name__ == "__main__":
         print_sanity(Re, score)
     print()
 
-    start_time    = time.time()
-    ld_results    = []
-    verified_best = {'naca': None, 'ld': -np.inf, 'params': None}
-    eval_count    = [0]  # list so closure can mutate it
+    # Populate before fork so all 6 workers inherit a read-only copy.
+    _worker_cfg.update({
+        'reynolds_range': reynolds_range,
+        'aoa_start':      aoa_start,
+        'aoa_end':        aoa_end,
+        'aoa_step':       aoa_step,
+        'max_ld':         MAX_LD,
+    })
 
-    def objective(params):
-        m, p, t = params
-        coords  = naca4_coordinates(m, p, t)
-        scores, avg_ld = evaluate_ld(coords, reynolds_range, aoa_start, aoa_end, aoa_step, MAX_LD)
-
-        eval_count[0] += 1
-        n       = eval_count[0]
-        elapsed = time.time() - start_time
-        naca    = f"{int(round(m))}{int(round(p))}{int(round(t)):02d}"
-
-        re_cols   = "  ".join(fmt_re_col(Re, i, scores) for i, Re in enumerate(reynolds_range))
-        avg_color = GREEN if np.isfinite(avg_ld) and avg_ld > 40 else WHITE
-        print(f"  {DIM}#{n:<4} {fmt_time(elapsed)}{RESET}  {WHITE}{BOLD}NACA {naca}{RESET}  {re_cols}  {DIM}avg{RESET} {avg_color}{avg_ld:.4f}{RESET}")
-
-        if np.isfinite(avg_ld) and avg_ld >= MIN_LD_TO_CONFIRM and avg_ld > verified_best['ld'] + CONFIRM_MARGIN:
-            _, ld_2 = evaluate_ld(coords, reynolds_range, aoa_start, aoa_end, aoa_step, MAX_LD)
-            _, ld_3 = evaluate_ld(coords, reynolds_range, aoa_start, aoa_end, aoa_step, MAX_LD)
-            runs           = [avg_ld] + [r for r in (ld_2, ld_3) if np.isfinite(r)]
-            confirmed_ld   = float(np.mean(runs))
-
-            if confirmed_ld > verified_best['ld']:
-                verified_best['ld']     = confirmed_ld
-                verified_best['naca']   = naca
-                verified_best['params'] = (m, p, t)
-                print(f"  {GREEN}confirmed{RESET}  {WHITE}{BOLD}NACA {naca}{RESET}  {DIM}run1{RESET} {YELLOW}{avg_ld:.4f}{RESET}  {DIM}run2{RESET} {YELLOW}{ld_2:.4f}{RESET}  {DIM}run3{RESET} {YELLOW}{ld_3:.4f}{RESET}  {DIM}avg{RESET} {GREEN}{confirmed_ld:.4f}{RESET}")
-                avg_ld = confirmed_ld
-            else:
-                print(f"  {RED}fluke{RESET}      {WHITE}{BOLD}NACA {naca}{RESET}  {DIM}run1{RESET} {YELLOW}{avg_ld:.4f}{RESET}  {DIM}run2{RESET} {YELLOW}{ld_2:.4f}{RESET}  {DIM}run3{RESET} {YELLOW}{ld_3:.4f}{RESET}  {DIM}avg{RESET} {YELLOW}{confirmed_ld:.4f}{RESET}  {DIM}discarded{RESET}")
-                avg_ld = confirmed_ld
-
-        ld_results.append((naca, avg_ld))
-        return -avg_ld if np.isfinite(avg_ld) else 0.0
+    start_time = time.time()
+    gen_count  = [0]
 
     def callback(xk, convergence):
+        gen_count[0] += 1
         elapsed = time.time() - start_time
-        if verified_best['naca'] is not None:
-            print(f"\n  {DIM}best so far  [{elapsed:.1f}s]{RESET}  {WHITE}{BOLD}NACA {verified_best['naca']}{RESET}  {DIM}l/d{RESET} {GREEN}{verified_best['ld']:.4f}{RESET}  {DIM}convergence{RESET} {MUTED}{convergence:.6f}{RESET}\n")
+        m, p, t = xk
+        naca = f"{int(round(m))}{int(round(p))}{int(round(t)):02d}"
+        print(f"  {DIM}gen {gen_count[0]:<3} [{elapsed:.1f}s]{RESET}  "
+              f"{WHITE}{BOLD}NACA {naca}{RESET}  "
+              f"{DIM}convergence{RESET} {MUTED}{convergence:.6f}{RESET}")
 
     result = differential_evolution(
-        objective,
+        _objective,
         bounds=cfg["bounds"],
         maxiter=cfg["maxiter"],
         popsize=cfg["popsize"],
         seed=cfg["seed"],
         tol=1e-4,
-        disp=True,
-        workers=1,
-        updating='immediate',
+        disp=False,
+        workers=6,
+        updating='deferred',
         callback=callback,
     )
 
     best_m, best_p, best_t = result.x
     best_naca   = f"{int(round(best_m))}{int(round(best_p))}{int(round(best_t)):02d}"
-    best_avg_ld = -result.fun
-
-    if verified_best['ld'] > best_avg_ld:
-        best_naca   = verified_best['naca']
-        best_avg_ld = verified_best['ld']
-        best_m, best_p, best_t = verified_best['params']
+    best_coords = naca4_coordinates(best_m, best_p, best_t)
 
     bar = f"{DIM}{'─'*60}{RESET}"
+    print(f"\n{DIM}verifying NACA {best_naca} (3 runs){RESET}")
+    run_lds = []
+    for i in range(3):
+        _, ld = evaluate_ld(best_coords, reynolds_range, aoa_start, aoa_end, aoa_step, MAX_LD)
+        run_lds.append(ld)
+        tag = f"{YELLOW}{ld:.4f}{RESET}" if np.isfinite(ld) else f"{RED}fail{RESET}"
+        print(f"  {DIM}run {i+1}{RESET}  {tag}")
+
+    valid_runs   = [r for r in run_lds if np.isfinite(r)]
+    confirmed_ld = float(np.mean(valid_runs)) if valid_runs else float('nan')
+
     print(f"\n{bar}")
     print(f"  {MUTED}airfoil{RESET}      {WHITE}{BOLD}NACA {best_naca}{RESET}")
     print(f"  {MUTED}params{RESET}       {DIM}m={best_m:.3f}  p={best_p:.3f}  t={best_t:.3f}{RESET}")
-    print(f"  {MUTED}avg l/d{RESET}      {GREEN}{best_avg_ld:.4f}{RESET}")
-    print(f"  {MUTED}evaluations{RESET}  {WHITE}{len(ld_results)}{RESET}")
+    print(f"  {MUTED}confirmed l/d{RESET}  {GREEN}{confirmed_ld:.4f}{RESET}")
+    print(f"  {MUTED}generations{RESET}  {WHITE}{gen_count[0]}{RESET}")
     print(f"  {MUTED}time{RESET}         {WHITE}{time.time()-start_time:.1f}s{RESET}")
     print(f"{bar}\n")
