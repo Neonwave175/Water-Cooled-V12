@@ -1,6 +1,8 @@
 # Water-Cooled-V12
 ## PLEASE USE TITANUM FOIL IF YOU ARE ON MACOS, IT IS 2000x FASTER AND GPU ACCELERATED ONLY USE THIS IF YOU ARE ON LINUX
 
+No more updates will be pushed, this is also read only
+
 Simple system for generating optimal wings and testing them
 
 > Designed for MacOS, .sh files won't work on Windows
